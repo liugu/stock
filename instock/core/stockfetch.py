@@ -18,6 +18,7 @@ import instock.core.crawling.stock_dzjy_em as sde
 import instock.core.crawling.stock_hist_em as she
 import instock.core.crawling.stock_fund_em as sff
 import instock.core.crawling.stock_fhps_em as sfe
+import instock.core.crawling.stock_cpbd as scp
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -46,6 +47,54 @@ def is_a_stock(code):
 # 过滤掉 st 股票。
 def is_not_st(name):
     return not name.startswith(('*ST', 'ST'))
+
+
+# 过滤退市风险股票（名称包含退市、退等字样）
+def is_not_delisted(name):
+    """过滤退市风险股票"""
+    delisted_keywords = ['退', '退市', 'PT']
+    return not any(kw in name for kw in delisted_keywords)
+
+
+# 综合风控过滤
+def filter_risk_stocks(data, name_col='name'):
+    """
+    过滤风险股票（ST、退市风险等）
+    
+    参数:
+        data: DataFrame，包含股票名称列
+        name_col: 股票名称列名
+    
+    返回:
+        DataFrame: 过滤后的数据
+        dict: 过滤统计信息
+    """
+    if data is None or len(data) == 0:
+        return data, {}
+    
+    original_count = len(data)
+    
+    # 过滤ST股票
+    st_mask = data[name_col].apply(lambda x: 'ST' in str(x).upper())
+    st_count = st_mask.sum()
+    
+    # 过滤退市风险股票
+    delisted_mask = data[name_col].apply(lambda x: any(kw in str(x) for kw in ['退', '退市', 'PT']))
+    delisted_count = delisted_mask.sum()
+    
+    # 应用过滤
+    risk_mask = ~(st_mask | delisted_mask)
+    filtered_data = data[risk_mask]
+    
+    stats = {
+        'original_count': original_count,
+        'filtered_count': len(filtered_data),
+        'st_count': st_count,
+        'delisted_count': delisted_count,
+        'total_removed': st_count + delisted_count
+    }
+    
+    return filtered_data, stats
 
 
 # 过滤价格，如果没有基本上是退市了。
@@ -91,16 +140,68 @@ def fetch_etfs(date):
 # 读取当天股票数据
 def fetch_stocks(date):
     try:
-        data = she.stock_zh_a_spot_em()
+        # 使用data_adapter获取数据 (支持自动切换数据源)
+        from instock.core.crawling.data_adapter import get_stock_spot
+        data = get_stock_spot()
         if data is None or len(data.index) == 0:
             return None
         if date is None:
             data.insert(0, 'date', datetime.datetime.now().strftime("%Y-%m-%d"))
         else:
             data.insert(0, 'date', date.strftime("%Y-%m-%d"))
-        data.columns = list(tbs.TABLE_CN_STOCK_SPOT['columns'])
-        data = data.loc[data['code'].apply(is_a_stock)].loc[data['new_price'].apply(is_open)]
-        return data
+        
+        # 创建符合表结构的DataFrame (41列)
+        result = pd.DataFrame()
+        result['date'] = data['date']
+        result['code'] = data['代码']
+        result['name'] = data['名称']
+        result['new_price'] = data['最新价']
+        result['change_rate'] = data['涨跌幅']
+        result['ups_downs'] = data['涨跌额']
+        result['volume'] = data['成交量']
+        result['deal_amount'] = data['成交额']
+        # 振幅和量比：东方财富有，新浪没有
+        result['amplitude'] = data.get('振幅', 0) if '振幅' in data.columns else 0
+        result['volume_ratio'] = data.get('量比', 0) if '量比' in data.columns else 0
+        result['turnoverrate'] = data['换手率']
+        result['open_price'] = data['今开']
+        result['high_price'] = data['最高']
+        result['low_price'] = data['最低']
+        result['pre_close_price'] = data['昨收']
+        result['speed_increase'] = 0
+        result['speed_increase_5'] = 0
+        result['speed_increase_60'] = 0
+        result['speed_increase_all'] = 0
+        
+        # 市盈率字段处理 - 东方财富有完整数据，新浪只有动态PE
+        result['dtsyl'] = data.get('市盈率动', 0) if '市盈率动' in data.columns else 0
+        result['pe9'] = data.get('市盈率TTM', 0) if '市盈率TTM' in data.columns else 0
+        result['pe'] = data.get('市盈率静', data.get('市盈率动', 0)) if '市盈率静' in data.columns else data.get('市盈率动', 0)
+        result['pbnewmrq'] = data.get('市净率', 0) if '市净率' in data.columns else 0
+        
+        # 基本面数据 - 东方财富有完整数据
+        result['basic_eps'] = data.get('每股收益', 0) if '每股收益' in data.columns else 0
+        result['bvps'] = data.get('每股净资产', 0) if '每股净资产' in data.columns else 0
+        result['per_capital_reserve'] = data.get('每股公积金', 0) if '每股公积金' in data.columns else 0
+        result['per_unassign_profit'] = data.get('每股未分配利润', 0) if '每股未分配利润' in data.columns else 0
+        result['roe_weight'] = data.get('加权净资产收益率', 0) if '加权净资产收益率' in data.columns else 0
+        result['sale_gpr'] = data.get('毛利率', 0) if '毛利率' in data.columns else 0
+        result['debt_asset_ratio'] = data.get('资产负债率', 0) if '资产负债率' in data.columns else 0
+        result['total_operate_income'] = data.get('营业收入', 0) if '营业收入' in data.columns else 0
+        result['toi_yoy_ratio'] = data.get('营业收入同比增长', 0) if '营业收入同比增长' in data.columns else 0
+        result['parent_netprofit'] = data.get('归属净利润', 0) if '归属净利润' in data.columns else 0
+        result['netprofit_yoy_ratio'] = data.get('归属净利润同比增长', 0) if '归属净利润同比增长' in data.columns else 0
+        result['report_date'] = None
+        result['total_shares'] = data.get('总股本', 0) if '总股本' in data.columns else 0
+        result['free_shares'] = data.get('已流通股份', 0) if '已流通股份' in data.columns else 0
+        result['total_market_cap'] = data['总市值']
+        result['free_cap'] = data['流通市值']
+        result['industry'] = data.get('所处行业', '') if '所处行业' in data.columns else ''
+        result['listing_date'] = None
+        
+        result.columns = list(tbs.TABLE_CN_STOCK_SPOT['columns'])
+        result = result.loc[result['code'].apply(is_a_stock)].loc[result['new_price'].apply(is_open)]
+        return result
     except Exception as e:
         logging.error(f"stockfetch.fetch_stocks处理异常：{e}")
     return None
@@ -256,12 +357,31 @@ def fetch_etf_hist(data_base, date_start=None, date_end=None, adjust='qfq'):
 
         if data is None or len(data.index) == 0:
             return None
-        data.columns = tuple(tbs.CN_STOCK_HIST_DATA['columns'])
+        
+        # 创建副本避免只读错误
+        data = data.copy()
+        
+        # 转换列名格式
+        data = data.rename(columns={
+            '日期': 'date',
+            '开盘': 'open',
+            '收盘': 'close',
+            '最高': 'high',
+            '最低': 'low',
+            '成交量': 'volume',
+            '成交额': 'amount',
+            '振幅': 'amplitude',
+            '涨跌幅': 'p_change',
+            '涨跌额': 'change',
+            '换手率': 'turnover'
+        })
         data = data.sort_index()  # 将数据按照日期排序下。
         if data is not None:
-            data.loc[:, 'p_change'] = tl.ROC(data['close'].values, 1)
-            data['p_change'].values[np.isnan(data['p_change'].values)] = 0.0
-            data["volume"] = data['volume'].values.astype('double') * 100  # 成交量单位从手变成股。
+            # 使用assign避免SettingWithCopyWarning
+            p_change = tl.ROC(data['close'].values, 1)
+            p_change[np.isnan(p_change)] = 0.0
+            data = data.assign(p_change=p_change)
+            data['volume'] = data['volume'].values.astype('float64') * 100  # 成交量单位从手变成股。
         return data
     except Exception as e:
         logging.error(f"stockfetch.fetch_etf_hist处理异常：{e}")
@@ -279,9 +399,13 @@ def fetch_stock_hist(data_base, date_start=None, is_cache=True):
     try:
         data = stock_hist_cache(code, date_start, None, is_cache, 'qfq')
         if data is not None:
-            data.loc[:, 'p_change'] = tl.ROC(data['close'].values, 1)
-            data['p_change'].values[np.isnan(data['p_change'].values)] = 0.0
-            data["volume"] = data['volume'].values.astype('double') * 100  # 成交量单位从手变成股。
+            # 创建副本避免只读错误
+            data = data.copy()
+            # 使用assign避免SettingWithCopyWarning
+            p_change = tl.ROC(data['close'].values, 1)
+            p_change[np.isnan(p_change)] = 0.0
+            data = data.assign(p_change=p_change)
+            data['volume'] = data['volume'].values.astype('float64') * 100  # 成交量单位从手变成股。
         return data
     except Exception as e:
         logging.error(f"stockfetch.fetch_stock_hist处理异常：{e}")
@@ -301,17 +425,36 @@ def stock_hist_cache(code, date_start, date_end=None, is_cache=True, adjust=''):
     # 如果缓存存在就直接返回缓存数据。压缩方式。
     try:
         if os.path.isfile(cache_file):
-            return pd.read_pickle(cache_file, compression="gzip")
+            data = pd.read_pickle(cache_file, compression="gzip")
+            return data.copy()  # 返回副本避免只读错误
         else:
-            if date_end is not None:
-                stock = she.stock_zh_a_hist(symbol=code, period="daily", start_date=date_start, end_date=date_end,
-                                            adjust=adjust)
-            else:
-                stock = she.stock_zh_a_hist(symbol=code, period="daily", start_date=date_start, adjust=adjust)
+            # 使用data_adapter获取数据 (支持自动切换数据源)
+            from instock.core.crawling.data_adapter import get_stock_hist
+            
+            # 格式转换: date_start是YYYYMMDD格式
+            stock = get_stock_hist(symbol=code, start_date=date_start, adjust=adjust, skip_em=True)
 
             if stock is None or len(stock.index) == 0:
                 return None
-            stock.columns = tuple(tbs.CN_STOCK_HIST_DATA['columns'])
+            
+            # 创建副本避免只读错误
+            stock = stock.copy()
+            
+            # 转换列名格式
+            stock = stock.rename(columns={
+                '日期': 'date',
+                '开盘': 'open',
+                '收盘': 'close',
+                '最高': 'high',
+                '最低': 'low',
+                '成交量': 'volume',
+                '成交额': 'amount',
+                '振幅': 'amplitude',
+                '涨跌幅': 'p_change',
+                '涨跌额': 'change',
+                '换手率': 'turnover'
+            })
+            # 不需要重新赋值列名，rename已经完成
             stock = stock.sort_index()  # 将数据按照日期排序下。
             try:
                 if is_cache:
@@ -322,4 +465,21 @@ def stock_hist_cache(code, date_start, date_end=None, is_cache=True, adjust=''):
             return stock
     except Exception as e:
         logging.error(f"stockfetch.stock_hist_cache处理异常：{code}代码{e}")
+    return None
+
+
+# 读取股票操盘必读数据（包含股东人数）
+def fetch_stock_cpbd_all(stock_codes):
+    """
+    批量抓取操盘必读数据（含股东人数）
+    :param stock_codes: 股票代码列表
+    :return: 合并后的DataFrame
+    """
+    try:
+        data = scp.stock_cpbd_all_em(stock_codes)
+        if data is None or len(data.index) == 0:
+            return None
+        return data
+    except Exception as e:
+        logging.error(f"stockfetch.fetch_stock_cpbd_all处理异常：{e}")
     return None

@@ -18,6 +18,101 @@ def is_trade_date(date=None):
         return False
 
 
+def is_holiday(date=None):
+    """
+    判断是否为节假日（非交易日）
+    
+    参数:
+        date: 日期对象或日期字符串
+    
+    返回:
+        bool: True表示节假日，False表示交易日
+    """
+    if date is None:
+        date = datetime.datetime.now().date()
+    
+    # 转换字符串为日期对象
+    if isinstance(date, str):
+        try:
+            date = datetime.datetime.strptime(date, '%Y-%m-%d').date()
+        except ValueError:
+            try:
+                date = datetime.datetime.strptime(date, '%Y%m%d').date()
+            except ValueError:
+                return True
+    
+    return not is_trade_date(date)
+
+
+def get_holiday_name(date=None):
+    """
+    获取节假日名称（常见节假日）
+    
+    参数:
+        date: 日期对象
+    
+    返回:
+        str: 节假日名称，如果不是节假日返回空字符串
+    """
+    if date is None:
+        date = datetime.datetime.now().date()
+    
+    if isinstance(date, str):
+        date = datetime.datetime.strptime(date, '%Y-%m-%d').date()
+    
+    # 如果是交易日，返回空
+    if is_trade_date(date):
+        return ""
+    
+    # 周末
+    if date.weekday() in [5, 6]:
+        return "周末"
+    
+    # 常见节假日判断（简化版）
+    month = date.month
+    day = date.day
+    
+    if month == 1 and day == 1:
+        return "元旦"
+    elif month == 5 and day in range(1, 6):
+        return "劳动节"
+    elif month == 10 and day in range(1, 8):
+        return "国庆节"
+    elif month == 2 and day in range(1, 15):
+        return "春节"
+    elif month == 4 and day in range(4, 7):
+        return "清明节"
+    elif month == 6 and day in range(10, 15):
+        return "端午节"
+    elif month == 9 and day in range(20, 30):
+        return "中秋节"
+    
+    return "休市日"
+
+
+def should_run_task(date=None):
+    """
+    判断是否应该执行任务
+    
+    参数:
+        date: 日期对象
+    
+    返回:
+        tuple: (是否执行, 原因)
+    """
+    if date is None:
+        date = datetime.datetime.now().date()
+    
+    if isinstance(date, str):
+        date = datetime.datetime.strptime(date, '%Y-%m-%d').date()
+    
+    if is_trade_date(date):
+        return True, "交易日"
+    
+    holiday_name = get_holiday_name(date)
+    return False, f"非交易日({holiday_name})"
+
+
 def get_previous_trade_date(date):
     trade_date = stock_trade_date().get_data()
     if trade_date is None:

@@ -14,6 +14,7 @@ from instock.core.strategy import parking_apron
 from instock.core.strategy import low_backtrace_increase
 from instock.core.strategy import keep_increasing
 from instock.core.strategy import high_tight_flag
+from instock.core.strategy import volume_breakout
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -388,6 +389,9 @@ TABLE_CN_STOCK_STRATEGIES = [
     {'name': 'cn_stock_strategy_climax_limitdown', 'cn': '放量跌停', 'size': 70, 'func': climax_limitdown.check,
      'columns': _tmp_columns},
     {'name': 'cn_stock_strategy_low_atr', 'cn': '低ATR成长', 'size': 70, 'func': low_atr.check_low_increase,
+     'columns': _tmp_columns},
+    {'name': 'cn_stock_strategy_volume_breakout', 'cn': '成交量异动', 'size': 70,
+     'func': volume_breakout.check,
      'columns': _tmp_columns}
 ]
 
@@ -939,7 +943,7 @@ CN_STOCK_CPBD = {'name': 'cn_stock_cpbd', 'cn': '操盘必读',
                              'TOTAL_NUM_RATIO': {'type': FLOAT, 'cn': '较上期变化'},
                              'AVG_FREE_SHARES': {'type': FLOAT, 'cn': '人均流通股'},
                              'AVG_FREESHARES_RATIO': {'type': FLOAT, 'cn': '较上期变化'},
-                             'HOLD_FOCUS': {'type': FLOAT, 'cn': '筹码集中度'},
+                             'HOLD_FOCUS': {'type': VARCHAR(20, _COLLATE), 'cn': '筹码集中度'},
                              'AVG_HOLD_AMT': {'type': FLOAT, 'cn': '人均持股金额'},
                              'HOLD_RATIO_TOTAL': {'type': FLOAT, 'cn': '十大股东持股'},
                              'FREEHOLD_RATIO_TOTAL': {'type': FLOAT, 'cn': '十大流通股东持股'},

@@ -19,15 +19,16 @@ if not os.path.exists(log_path):
     os.makedirs(log_path)
 logging.basicConfig(format='%(asctime)s %(message)s', filename=os.path.join(log_path, 'stock_execute_job.log'))
 logging.getLogger().setLevel(logging.INFO)
-import init_job as bj
-import basic_data_daily_job as hdj
-import basic_data_other_daily_job as hdtj
-import basic_data_after_close_daily_job as acdj
-import indicators_data_daily_job as gdj
-import strategy_data_daily_job as sdj
-import backtest_data_daily_job as bdj
-import klinepattern_data_daily_job as kdj
-import selection_data_daily_job as sddj
+import instock.job.init_job as bj
+import instock.job.basic_data_daily_job as hdj
+import instock.job.basic_data_other_daily_job as hdtj
+import instock.job.basic_data_after_close_daily_job as acdj
+import instock.job.indicators_data_daily_job as gdj
+import instock.job.strategy_data_daily_job as sdj
+import instock.job.backtest_data_daily_job as bdj
+import instock.job.klinepattern_data_daily_job as kdj
+import instock.job.selection_data_daily_job as sddj
+import instock.job.cpbd_data_daily_job as cdj
 
 print('112')
 
@@ -58,7 +59,10 @@ def main():
     # # # # 第6步创建股票回测
     bdj.main()
 
-    # # # # 第7步创建股票闭盘后才有的数据
+    # # # # 第7步创建操盘必读数据（含股东人数）
+    cdj.main()
+
+    # # # # 第8步创建股票闭盘后才有的数据
     acdj.main()
 
     logging.info("######## 完成任务, 使用时间: %s 秒 #######" % (time.time() - start))
