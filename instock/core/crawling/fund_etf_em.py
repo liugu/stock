@@ -5,10 +5,15 @@ Date: 2023/1/4 12:18
 Desc: 东方财富-ETF 行情
 https://quote.eastmoney.com/sh513500.html
 """
+import logging
 from functools import lru_cache
 
 import pandas as pd
 import requests
+
+from instock.core.crawling.rate_limiter import limiter
+
+logger = logging.getLogger(__name__)
 
 
 def fund_etf_spot_em() -> pd.DataFrame:
@@ -18,7 +23,7 @@ def fund_etf_spot_em() -> pd.DataFrame:
     :return: ETF 实时行情
     :rtype: pandas.DataFrame
     """
-    url = "http://88.push2.eastmoney.com/api/qt/clist/get"
+    url = "https://push2.eastmoney.com/api/qt/clist/get"
     params = {
         "pn": "1",
         "pz": "2000",
@@ -33,7 +38,7 @@ def fund_etf_spot_em() -> pd.DataFrame:
         "fields": "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f22,f11,f62,f128,f136,f115,f152",
         "_": "1672806290972",
     }
-    r = requests.get(url, params=params)
+    r = limiter.get(url, params=params)
     data_json = r.json()
     temp_df = pd.DataFrame(data_json["data"]["diff"])
     temp_df.rename(
@@ -96,7 +101,7 @@ def _fund_etf_code_id_map_em() -> dict:
     :return: ETF 代码和市场标识映射
     :rtype: pandas.DataFrame
     """
-    url = "http://88.push2.eastmoney.com/api/qt/clist/get"
+    url = "https://push2.eastmoney.com/api/qt/clist/get"
     params = {
         "pn": "1",
         "pz": "5000",
@@ -111,7 +116,7 @@ def _fund_etf_code_id_map_em() -> dict:
         "fields": "f12,f13",
         "_": "1672806290972",
     }
-    r = requests.get(url, params=params)
+    r = limiter.get(url, params=params)
     data_json = r.json()
     temp_df = pd.DataFrame(data_json["data"]["diff"])
     temp_dict = dict(zip(temp_df["f12"], temp_df["f13"]))
@@ -155,7 +160,7 @@ def fund_etf_hist_em(
         "end": end_date,
         "_": "1623766962675",
     }
-    r = requests.get(url, params=params)
+    r = limiter.get(url, params=params)
     data_json = r.json()
     if not (data_json["data"] and data_json["data"]["klines"]):
         return pd.DataFrame()
@@ -229,7 +234,7 @@ def fund_etf_hist_min_em(
             "secid": f"{code_id_dict[symbol]}.{symbol}",
             "_": "1623766962675",
         }
-        r = requests.get(url, params=params)
+        r = limiter.get(url, params=params)
         data_json = r.json()
         temp_df = pd.DataFrame(
             [item.split(",") for item in data_json["data"]["trends"]]
@@ -269,7 +274,7 @@ def fund_etf_hist_min_em(
             "end": "20500000",
             "_": "1630930917857",
         }
-        r = requests.get(url, params=params)
+        r = limiter.get(url, params=params)
         data_json = r.json()
         temp_df = pd.DataFrame(
             [item.split(",") for item in data_json["data"]["klines"]]

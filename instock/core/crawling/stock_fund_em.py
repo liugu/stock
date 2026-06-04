@@ -6,14 +6,19 @@ Desc: 东方财富网-数据中心-资金流向
 https://data.eastmoney.com/zjlx/detail.html
 """
 import json
+import logging
 import time
 from functools import lru_cache
 
 import pandas as pd
 import requests
 
+from instock.core.crawling.rate_limiter import limiter
+
 __author__ = 'myh '
 __date__ = '2023/6/12 '
+
+logger = logging.getLogger(__name__)
 
 
 def stock_individual_fund_flow_rank(indicator: str = "5日") -> pd.DataFrame:
@@ -43,7 +48,7 @@ def stock_individual_fund_flow_rank(indicator: str = "5日") -> pd.DataFrame:
             "f12,f14,f2,f160,f174,f175,f176,f177,f178,f179,f180,f181,f182,f183,f260,f261,f124",
         ],
     }
-    url = "http://push2.eastmoney.com/api/qt/clist/get"
+    url = "https://push2.eastmoney.com/api/qt/clist/get"
     params = {
         "fid": indicator_map[indicator][0],
         "po": "1",
@@ -56,7 +61,7 @@ def stock_individual_fund_flow_rank(indicator: str = "5日") -> pd.DataFrame:
         "fs": "m:0+t:6+f:!2,m:0+t:13+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:7+f:!2,m:1+t:3+f:!2",
         "fields": indicator_map[indicator][1],
     }
-    r = requests.get(url, params=params)
+    r = limiter.get(url, params=params)
     data_json = r.json()
     temp_df = pd.DataFrame(data_json["data"]["diff"])
     temp_df = temp_df[~temp_df["f2"].isin(["-"])]
@@ -251,7 +256,7 @@ def stock_sector_fund_flow_rank(
             "f12,f14,f2,f160,f174,f175,f176,f177,f178,f179,f180,f181,f182,f183,f260,f261,f124",
         ],
     }
-    url = "http://push2.eastmoney.com/api/qt/clist/get"
+    url = "https://push2.eastmoney.com/api/qt/clist/get"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36",
     }
@@ -271,7 +276,7 @@ def stock_sector_fund_flow_rank(
         "cb": "jQuery18308357908311220152_1589256588824",
         "_": int(time.time() * 1000),
     }
-    r = requests.get(url, params=params, headers=headers)
+    r = limiter.get(url, params=params, headers=headers)
     text_data = r.text
     json_data = json.loads(text_data[text_data.find("{") : -2])
     temp_df = pd.DataFrame(json_data["data"]["diff"])

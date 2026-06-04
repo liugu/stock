@@ -7,9 +7,11 @@ https://finance.sina.com.cn/realstock/company/klc_td_sh.txt
 此处可以用来更新 calendar.json 文件，注意末尾没有 "," 号
 """
 import datetime
+import logging
 import pandas as pd
 import requests
 from py_mini_racer import MiniRacer
+from instock.core.crawling.rate_limiter import limiter
 
 hk_js_decode = """
 function d(t) {
@@ -310,7 +312,7 @@ def tool_trade_date_hist_sina() -> pd.DataFrame:
     :rtype: pandas.DataFrame
     """
     url = "https://finance.sina.com.cn/realstock/company/klc_td_sh.txt"
-    r = requests.get(url)
+    r = limiter.get(url)
     js_code = MiniRacer()
     js_code.eval(hk_js_decode)
     dict_list = js_code.call(

@@ -6,8 +6,12 @@ Desc: 东方财富网-行情首页-沪深京 A 股
 """
 import requests
 import pandas as pd
+import logging
 
 from functools import lru_cache
+from instock.core.crawling.rate_limiter import limiter
+
+logger = logging.getLogger(__name__)
 
 
 def stock_zh_a_spot_em() -> pd.DataFrame:
@@ -17,7 +21,7 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
     :return: 实时行情
     :rtype: pandas.DataFrame
     """
-    url = "http://82.push2.eastmoney.com/api/qt/clist/get"
+    url = "https://push2.eastmoney.com/api/qt/clist/get"
     params = {
         "pn": "1",
         "pz": "50000",
@@ -31,7 +35,7 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
         "fields": "f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f14,f15,f16,f17,f18,f20,f21,f22,f23,f24,f25,f26,f37,f38,f39,f40,f41,f45,f46,f48,f49,f57,f61,f100,f112,f113,f114,f115,f221",
         "_": "1623833739532",
     }
-    r = requests.get(url, params=params)
+    r = limiter.get(url, params=params)
     data_json = r.json()
     if not data_json["data"]["diff"]:
         return pd.DataFrame()
@@ -171,7 +175,7 @@ def code_id_map_em() -> dict:
     :return: 股票和市场代码
     :rtype: dict
     """
-    url = "http://80.push2.eastmoney.com/api/qt/clist/get"
+    url = "https://push2.eastmoney.com/api/qt/clist/get"
     params = {
         "pn": "1",
         "pz": "50000",
@@ -185,7 +189,7 @@ def code_id_map_em() -> dict:
         "fields": "f12",
         "_": "1623833739532",
     }
-    r = requests.get(url, params=params)
+    r = limiter.get(url, params=params)
     data_json = r.json()
     if not data_json["data"]["diff"]:
         return dict()
@@ -206,7 +210,7 @@ def code_id_map_em() -> dict:
         "fields": "f12",
         "_": "1623833739532",
     }
-    r = requests.get(url, params=params)
+    r = limiter.get(url, params=params)
     data_json = r.json()
     if not data_json["data"]["diff"]:
         return dict()
@@ -226,7 +230,7 @@ def code_id_map_em() -> dict:
         "fields": "f12",
         "_": "1623833739532",
     }
-    r = requests.get(url, params=params)
+    r = limiter.get(url, params=params)
     data_json = r.json()
     if not data_json["data"]["diff"]:
         return dict()
@@ -274,7 +278,7 @@ def stock_zh_a_hist(
         "end": end_date,
         "_": "1623766962675",
     }
-    r = requests.get(url, params=params)
+    r = limiter.get(url, params=params)
     data_json = r.json()
     if not (data_json["data"] and data_json["data"]["klines"]):
         return pd.DataFrame()
@@ -351,7 +355,7 @@ def stock_zh_a_hist_min_em(
             "secid": f"{code_id_dict[symbol]}.{symbol}",
             "_": "1623766962675",
         }
-        r = requests.get(url, params=params)
+        r = limiter.get(url, params=params)
         data_json = r.json()
         temp_df = pd.DataFrame(
             [item.split(",") for item in data_json["data"]["trends"]]
@@ -391,7 +395,7 @@ def stock_zh_a_hist_min_em(
             "end": "20500000",
             "_": "1630930917857",
         }
-        r = requests.get(url, params=params)
+        r = limiter.get(url, params=params)
         data_json = r.json()
         temp_df = pd.DataFrame(
             [item.split(",") for item in data_json["data"]["klines"]]
@@ -470,7 +474,7 @@ def stock_zh_a_hist_pre_min_em(
         "secid": f"{code_id_dict[symbol]}.{symbol}",
         "_": "1623766962675",
     }
-    r = requests.get(url, params=params)
+    r = limiter.get(url, params=params)
     data_json = r.json()
     temp_df = pd.DataFrame(
         [item.split(",") for item in data_json["data"]["trends"]]
@@ -499,6 +503,88 @@ def stock_zh_a_hist_pre_min_em(
     temp_df["成交额"] = pd.to_numeric(temp_df["成交额"])
     temp_df["最新价"] = pd.to_numeric(temp_df["最新价"])
     temp_df["时间"] = pd.to_datetime(temp_df["时间"]).astype(str)
+    return temp_df
+
+
+def stock_zh_a_spot_sina() -> pd.DataFrame:
+    """新浪财经-沪深京 A 股-实时行情（备用接口）
+    :return: 实时行情
+    :rtype: pandas.DataFrame
+    """
+    import json
+    
+    url = "http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": "http://vip.stock.finance.sina.com.cn/",
+    }
+    
+    all_data = []
+    page = 1
+    num_per_page = 1000
+    
+    while True:
+        params = {
+            "page": str(page),
+            "num": str(num_per_page),
+            "sort": "symbol",
+            "asc": "1",
+            "node": "hs_a",
+            "symbol": "",
+            "_s_r_a": "page",
+        }
+        try:
+            r = limiter.get(url, params=params, headers=headers, timeout=30)
+            data = json.loads(r.text)
+            if not data:
+                break
+            all_data.extend(data)
+            if len(data) < num_per_page:
+                break
+            page += 1
+        except Exception as e:
+            print(f"新浪接口获取数据失败: {e}")
+            break
+    
+    if not all_data:
+        return pd.DataFrame()
+    
+    temp_df = pd.DataFrame(all_data)
+    
+    # 字段映射
+    column_map = {
+        "code": "代码",
+        "name": "名称",
+        "trade": "最新价",
+        "changepercent": "涨跌幅",
+        "pricechange": "涨跌额",
+        "volume": "成交量",
+        "amount": "成交额",
+        "high": "最高",
+        "low": "最低",
+        "open": "今开",
+        "settlement": "昨收",
+        "per": "市盈率动",
+        "pb": "市净率",
+        "mktcap": "总市值",
+        "nmc": "流通市值",
+        "turnoverratio": "换手率",
+    }
+    
+    temp_df = temp_df.rename(columns=column_map)
+    
+    # 选择需要的列
+    cols = ["代码", "名称", "最新价", "涨跌幅", "涨跌额", "成交量", "成交额", 
+            "最高", "最低", "今开", "昨收", "换手率", "市盈率动", "市净率", 
+            "总市值", "流通市值"]
+    temp_df = temp_df[[c for c in cols if c in temp_df.columns]]
+    
+    # 类型转换
+    for col in ["最新价", "涨跌幅", "涨跌额", "成交量", "成交额", "最高", "最低", 
+                "今开", "昨收", "换手率", "市盈率动", "市净率", "总市值", "流通市值"]:
+        if col in temp_df.columns:
+            temp_df[col] = pd.to_numeric(temp_df[col], errors="coerce")
+    
     return temp_df
 
 
