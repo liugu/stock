@@ -1,0 +1,21 @@
+{
+    "wechat_webhook": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY",
+    "serverchan_key": "SCT347969TWcw4Zztqp8nMDiwYE4ik2EOW",
+    "push_method": "serverchan",
+    "enable_wechat": true,
+    "output_dir": "./output",
+    "strategies": [
+        {"name": "cn_stock_strategy_enter", "cn": "放量上涨"},
+        {"name": "cn_stock_strategy_keep_increasing", "cn": "均线多头"},
+        {"name": "cn_stock_strategy_parking_apron", "cn": "停机坪"},
+        {"name": "cn_stock_strategy_backtrace_ma250", "cn": "回踩年线"},
+        {"name": "cn_stock_strategy_breakthrough_platform", "cn": "突破平台"},
+        {"name": "cn_stock_strategy_low_backtrace_increase", "cn": "无大幅回撤"},
+        {"name": "cn_stock_strategy_turtle_trade", "cn": "海龟交易法则"},
+        {"name": "cn_stock_strategy_high_tight_flag", "cn": "高而窄的旗形"},
+        {"name": "cn_stock_strategy_climax_limitdown", "cn": "放量跌停"},
+        {"name": "cn_stock_strategy_low_atr", "cn": "低ATR成长"},
+        {"name": "cn_stock_strategy_consecutive_small_bullish", "cn": "连续小阳线"},
+        {"name": "cn_stock_strategy_consecutive_bullish_at_low", "cn": "连续小阳线低位"}
+    ]
+}
