@@ -28,7 +28,7 @@ def check(code_name, data, date=None, threshold=60):
         return False
 
     data.loc[:, 'vol_ma5'] = tl.MA(data['volume'].values, timeperiod=5)
-    data['vol_ma5'].values[np.isnan(data['vol_ma5'].values)] = 0.0
+    data.loc[:, 'vol_ma5'] = np.where(np.isnan(data['vol_ma5'].values), 0.0, data['vol_ma5'].values)
 
     data = data.tail(n=threshold + 1)
     if len(data.index) < threshold + 1:

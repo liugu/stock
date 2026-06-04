@@ -24,7 +24,8 @@ def check(code_name, data, date=None, threshold=30):
         return False
 
     data.loc[:, 'ma30'] = tl.MA(data['close'].values, timeperiod=30)
-    data['ma30'].values[np.isnan(data['ma30'].values)] = 0.0
+    # 修复：使用 np.where 替代直接赋值，避免只读数组错误
+    data.loc[:, 'ma30'] = np.where(np.isnan(data['ma30'].values), 0.0, data['ma30'].values)
 
     data = data.tail(n=threshold)
 
