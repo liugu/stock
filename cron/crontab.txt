@@ -1,0 +1,9 @@
+# A股量化分析定时任务
+# 每个交易日 15:30 更新数据并选股
+30 15 * * 1-5 cd /home/liugu/workspace/stock && /usr/bin/python3 cron/daily_task.py >> log/cron.log 2>&1
+
+# 每个交易日 18:00 分析消息面
+0 18 * * 1-5 cd /home/liugu/workspace/stock && /usr/bin/python3 cron/news_analysis.py --push >> log/cron.log 2>&1
+
+# 每周六 10:00 运行回测
+0 10 * * 6 cd /home/liugu/workspace/stock && /usr/bin/python3 backtest_stocks.py >> log/backtest.log 2>&1

@@ -1,0 +1,216 @@
+{% extends "layout/default.html" %}
+
+{% block main_content %}
+<link rel="stylesheet" href="/static/css/bootstrap-datepicker3.min.css" />
+<script src="/static/js/bootstrap-datepicker.min.js"></script>
+<script src="/static/js/bootstrap-datepicker.zh-CN.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+
+<div style="padding: 20px;">
+    <div style="display: flex; align-items: center; margin-bottom: 20px; gap: 15px;">
+        <div>
+            <label>股票代码:</label>
+            <input type="text" id="codeInput" value="{{ code }}" style="width: 100px; padding: 5px; margin-left: 10px;">
+        </div>
+        <div>
+            <label>日期:</label>
+            <input type="text" id="dateInput" value="{{ date }}" class="date-picker" style="width: 120px; padding: 5px; margin-left: 10px;">
+        </div>
+        <button id="queryBtn" style="padding: 8px 20px; background: #307ecc; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            查询
+        </button>
+        <button id="syncBtn" style="padding: 8px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            一键同步最新数据
+        </button>
+    </div>
+    
+    <div id="klineChart" style="width: 100%; height: 600px; border: 1px solid #ddd; border-radius: 4px;"></div>
+    
+    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+        <h4 style="margin: 0 0 10px 0;">股票信息</h4>
+        <div id="stockInfo" style="font-size: 14px; color: #666;"></div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    let chart;
+    
+    $(document).ready(function() {
+        // 初始化ECharts
+        chart = echarts.init(document.getElementById('klineChart'));
+        
+        // 日期选择器
+        $('.date-picker').datepicker({
+            language: 'zh-CN',
+            format: 'yyyy-mm-dd',
+            autoclose: true,
+            todayHighlight: true
+        });
+        
+        // 查询按钮
+        $('#queryBtn').click(function() {
+            const code = $('#codeInput').val().trim();
+            const date = $('#dateInput').val();
+            if (code) {
+                loadKlineData(code, date);
+            }
+        });
+        
+        // 同步数据按钮
+        $('#syncBtn').click(function() {
+            syncData();
+        });
+        
+        // 回车键查询
+        $('#codeInput').keypress(function(e) {
+            if (e.which === 13) {
+                $('#queryBtn').click();
+            }
+        });
+        
+        // 初始加载
+        if ('{{ code }}') {
+            loadKlineData('{{ code }}', '{{ date }}');
+        }
+    });
+    
+    function loadKlineData(code, date) {
+        $('#stockInfo').html('正在加载...');
+        
+        $.ajax({
+            url: '/instock/api/kline?code=' + code,
+            method: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    renderChart(response.data);
+                    $('#stockInfo').html('数据加载成功');
+                } else {
+                    $('#stockInfo').html('错误: ' + response.message);
+                    chart.setOption({
+                        title: {
+                            text: '加载失败: ' + response.message,
+                            textStyle: { color: '#f00' }
+                        },
+                        series: []
+                    });
+                }
+            },
+            error: function(xhr, status, error) {
+                $('#stockInfo').html('请求失败: ' + error);
+                chart.setOption({
+                    title: {
+                        text: '网络错误',
+                        textStyle: { color: '#f00' }
+                    },
+                    series: []
+                });
+            }
+        });
+    }
+    
+    function syncData() {
+        const btn = $('#syncBtn');
+        btn.prop('disabled', true).text('同步中...');
+        
+        $.ajax({
+            url: '/instock/api/sync',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ action: 'sync_realtime' }),
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    alert('数据同步成功！\n' + response.message);
+                    // 重新加载当前股票数据
+                    const code = $('#codeInput').val();
+                    if (code) {
+                        loadKlineData(code, $('#dateInput').val());
+                    }
+                } else {
+                    alert('同步失败: ' + (response.message || '未知错误'));
+                }
+            },
+            error: function(xhr, status, error) {
+                alert('同步失败: ' + error);
+            },
+            complete: function() {
+                btn.prop('disabled', false).text('一键同步最新数据');
+            }
+        });
+    }
+    
+    function renderChart(data) {
+        if (!data || !data.kline || data.kline.length === 0) {
+            chart.setOption({
+                title: { text: '无数据', textStyle: { color: '#f00' } },
+                series: []
+            });
+            return;
+        }
+        
+        const dates = data.kline.map(item => item[0]);
+        const klineData = data.kline.map(item => [item[1], item[2], item[3], item[4]]);
+        const volumes = data.kline.map(item => item[5]);
+        
+        const option = {
+            title: {
+                text: data.name + ' ' + data.symbol + ' K线图',
+                left: 'center',
+                textStyle: { fontSize: 16, fontWeight: 'bold' }
+            },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'cross' },
+                formatter: function(params) {
+                    let res = params[0].axisValue + '<br/>';
+                    res += '开盘: ' + params[0].data[1] + '<br/>';
+                    res += '收盘: ' + params[0].data[2] + '<br/>';
+                    res += '最高: ' + params[0].data[3] + '<br/>';
+                    res += '最低: ' + params[0].data[4] + '<br/>';
+                    res += '成交量: ' + params[0].data[5] + '<br/>';
+                    return res;
+                }
+            },
+            grid: {
+                left: '60',
+                right: '20',
+                top: '80',
+                bottom: '60'
+            },
+            xAxis: {
+                type: 'category',
+                data: dates,
+                axisPointer: { type: 'shadow' }
+            },
+            yAxis: {
+                type: 'value',
+                scale: true,
+                splitLine: { show: true },
+                axisPointer: { type: 'shadow' }
+            },
+            series: [
+                {
+                    name: 'K线',
+                    type: 'candlestick',
+                    data: klineData,
+                    itemStyle: {
+                        color: '#ef232a',
+                        color0: '#14b149',
+                        borderColor: '#ef232a',
+                        borderColor0: '#14b149'
+                    },
+                    markLine: {
+                        symbol: ['none', 'none'],
+                        data: [
+                            { yAxis: 0, label: { message: '0' } }
+                        ]
+                    }
+                }
+            ]
+        };
+        
+        chart.setOption(option);
+    }
+</script>
+{% end %}

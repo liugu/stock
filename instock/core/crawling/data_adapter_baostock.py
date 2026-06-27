@@ -12,8 +12,12 @@ import glob
 
 logger = logging.getLogger(__name__)
 
-# Baostock 数据目录
-_BAOSTOCK_DATA_DIR = '/home/liugu/workspace/stock/data/baostock'
+# ============ Baostock 数据目录（跨平台兼容） ============
+# 动态获取项目根目录，支持 Windows 和 Linux
+_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.abspath(os.path.join(_CURRENT_DIR, '..', '..', '..'))
+
+_BAOSTOCK_DATA_DIR = os.path.join(_PROJECT_ROOT, 'data', 'baostock')
 
 def is_baostock_available() -> bool:
     """检查 Baostock 本地数据是否可用"""

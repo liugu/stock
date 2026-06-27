@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import logging
@@ -26,6 +26,8 @@ import instock.lib.database as mdb
 import instock.lib.version as version
 import instock.web.dataTableHandler as dataTableHandler
 import instock.web.dataIndicatorsHandler as dataIndicatorsHandler
+import instock.web.stockListHandler as stockListHandler
+import instock.web.klineHandler as klineHandler
 import instock.web.base as webBase
 
 __author__ = 'myh '
@@ -38,11 +40,17 @@ class Application(tornado.web.Application):
             # 设置路由
             (r"/", HomeHandler),
             (r"/instock/", HomeHandler),
+            # 全股数据页面
+            (r"/instock/stock_list", stockListHandler.GetStockListHtmlHandler),
+            (r"/instock/api/sync", stockListHandler.SyncRealtimeDataHandler),
             # 使用datatable 展示报表数据模块。
             (r"/instock/api_data", dataTableHandler.GetStockDataHandler),
             (r"/instock/data", dataTableHandler.GetStockHtmlHandler),
             # 获得股票指标数据。
             (r"/instock/data/indicators", dataIndicatorsHandler.GetDataIndicatorsHandler),
+            # K线图表
+            (r"/instock/kline", klineHandler.GetKlineHtmlHandler),
+            (r"/instock/api/kline", klineHandler.GetKlineDataHandler),
             # 加入关注
             (r"/instock/control/attention", dataIndicatorsHandler.SaveCollectHandler),
         ]
@@ -69,6 +77,19 @@ class HomeHandler(webBase.BaseHandler, ABC):
 
 
 def main():
+    print("main()开始执行")
+    # tornado.options.parse_command_line()
+    tornado.options.options.logging = None
+    print("开始创建Application...")
+    http_server = tornado.httpserver.HTTPServer(Application())
+    print("Application创建成功，开始监听...")
+    port = 9988
+    http_server.listen(port)
+    print(f"服务已启动，web地址 : http://localhost:{port}/")
+    logging.error(f"服务已启动，web地址 : http://localhost:{port}/")
+    print("开始启动IOLoop...")
+    tornado.ioloop.IOLoop.current().start()
+    print("IOLoop已停止")
     # tornado.options.parse_command_line()
     tornado.options.options.logging = None
 

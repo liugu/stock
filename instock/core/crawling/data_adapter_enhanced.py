@@ -96,90 +96,112 @@ def baostock_logout():
 def stock_zh_a_hist_baostock(symbol: str, start_date: str = "2020-01-01", 
                               end_date: str = "2050-01-01", 
                               adjust: str = "2") -> pd.DataFrame:
-    """
-    使用 Baostock 获取个股历史数据
+    """使用 Baostock 获取个股历史数据（支持自动重新登录）
     :param symbol: 股票代码 (6位数字)
     :param start_date: 开始日期 YYYY-MM-DD 或 YYYYMMDD
     :param end_date: 结束日期 YYYY-MM-DD 或 YYYYMMDD
     :param adjust: 1-后复权, 2-前复权, 3-不复权
     """
+    global _baostock_logged_in  # 在函数开头声明 global
+    
     if not is_baostock_available():
         return pd.DataFrame()
     
     import baostock as bs
     
-    try:
-        # 登录
-        if not baostock_login():
-            return pd.DataFrame()
-        
-        # 转换日期格式 (支持 YYYYMMDD 和 YYYY-MM-DD)
-        if len(start_date) == 8:
-            start_date = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:8]}"
-        if len(end_date) == 8:
-            end_date = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:8]}"
-        
-        # 转换股票代码格式 (000001 -> sz.000001 或 sh.600000)
-        if symbol.startswith(('600', '601', '603', '605', '688', '689')):
-            bs_code = f'sh.{symbol}'
-        else:
-            bs_code = f'sz.{symbol}'
-        
-        # 查询数据
-        rs = bs.query_history_k_data_plus(
-            bs_code,
-            "date,code,open,high,low,close,volume,amount,adjustflag,turn,tradestatus,pbMRQ,peTTM",
-            start_date=start_date, 
-            end_date=end_date,
-            frequency="d", 
-            adjustflag=adjust
-        )
-        
-        if rs.error_code != '0':
-            logger.warning(f"[Baostock] 查询失败: {rs.error_msg}")
-            return pd.DataFrame()
-        
-        # 整理数据
-        data_list = []
-        while (rs.error_code == '0') & rs.next():
-            data_list.append(rs.get_row_data())
-        
-        if not data_list:
-            return pd.DataFrame()
-        
-        df = pd.DataFrame(data_list, columns=rs.fields)
-        
-        # 转换数据类型
-        df['date'] = pd.to_datetime(df['date'])
-        for col in ['open', 'high', 'low', 'close', 'volume', 'amount', 'turn']:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # 重命名列
-        df = df.rename(columns={
-            'date': '日期',
-            'open': '开盘',
-            'high': '最高',
-            'low': '最低',
-            'close': '收盘',
-            'volume': '成交量',
-            'amount': '成交额',
-            'turn': '换手率'
-        })
-        
-        # 计算涨跌幅
-        df['涨跌幅'] = df['收盘'].pct_change() * 100
-        df['涨跌额'] = df['收盘'].diff()
-        df['振幅'] = ((df['最高'] - df['最低']) / df['收盘'].shift(1)) * 100
-        
-        df = df[['日期', '开盘', '收盘', '最高', '最低', '成交量', '成交额', 
-                 '振幅', '涨跌幅', '涨跌额', '换手率']]
-        
-        logger.info(f"[Baostock] 获取 {symbol} 历史数据成功, {len(df)} 条")
-        return df
-        
-    except Exception as e:
-        logger.warning(f"[Baostock] 获取 {symbol} 历史数据失败: {e}")
-        return pd.DataFrame()
+    # 最多尝试 2 次（第一次失败后重新登录再试）
+    for attempt in range(2):
+        try:
+            # 登录
+            if not baostock_login():
+                return pd.DataFrame()
+            
+            # 转换日期格式 (支持 YYYYMMDD 和 YYYY-MM-DD)
+            if len(start_date) == 8:
+                start_date = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:8]}"
+            if len(end_date) == 8:
+                end_date = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:8]}"
+            
+            # 转换股票代码格式 (000001 -> sz.000001 或 sh.600000)
+            if symbol.startswith(('600', '601', '603', '605', '688', '689')):
+                bs_code = f'sh.{symbol}'
+            else:
+                bs_code = f'sz.{symbol}'
+            
+            # 查询数据
+            rs = bs.query_history_k_data_plus(
+                bs_code,
+                "date,code,open,high,low,close,volume,amount,adjustflag,turn,tradestatus,pbMRQ,peTTM",
+                start_date=start_date, 
+                end_date=end_date,
+                frequency="d", 
+                adjustflag=adjust
+            )
+            
+            # 检查是否需要重新登录
+            if rs.error_code != '0':
+                error_msg = rs.error_msg
+                # 如果是登录相关错误，尝试重新登录
+                if '未登录' in error_msg or 'login' in error_msg.lower():
+                    logger.warning(f"[Baostock] 会话失效，尝试重新登录 (尝试 {attempt + 1}/2)")
+                    _baostock_logged_in = False
+                    baostock_logout()
+                    continue  # 重试
+                else:
+                    logger.warning(f"[Baostock] 查询失败: {error_msg}")
+                    return pd.DataFrame()
+            
+            # 整理数据
+            data_list = []
+            while (rs.error_code == '0') & rs.next():
+                data_list.append(rs.get_row_data())
+            
+            if not data_list:
+                return pd.DataFrame()
+            
+            df = pd.DataFrame(data_list, columns=rs.fields)
+            
+            # 转换数据类型
+            df['date'] = pd.to_datetime(df['date'])
+            for col in ['open', 'high', 'low', 'close', 'volume', 'amount', 'turn']:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # 重命名列
+            df = df.rename(columns={
+                'date': '日期',
+                'open': '开盘',
+                'high': '最高',
+                'low': '最低',
+                'close': '收盘',
+                'volume': '成交量',
+                'amount': '成交额',
+                'turn': '换手率'
+            })
+            
+            # 计算涨跌幅
+            df['涨跌幅'] = df['收盘'].pct_change() * 100
+            df['涨跌额'] = df['收盘'].diff()
+            df['振幅'] = ((df['最高'] - df['最低']) / df['收盘'].shift(1)) * 100
+            
+            df = df[['日期', '开盘', '收盘', '最高', '最低', '成交量', '成交额', 
+                     '振幅', '涨跌幅', '涨跌额', '换手率']]
+            
+            logger.info(f"[Baostock] 获取 {symbol} 历史数据成功, {len(df)} 条")
+            return df
+            
+        except Exception as e:
+            error_str = str(e)
+            # 如果是登录相关异常，尝试重新登录
+            if '未登录' in error_str or 'login' in error_str.lower() or attempt == 0:
+                logger.warning(f"[Baostock] 异常，尝试重新登录: {e}")
+                _baostock_logged_in = False
+                baostock_logout()
+                continue  # 重试
+            else:
+                logger.warning(f"[Baostock] 获取 {symbol} 历史数据失败: {e}")
+                return pd.DataFrame()
+    
+    return pd.DataFrame()
 
 
 def stock_zh_a_spot_baostock() -> pd.DataFrame:

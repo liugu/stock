@@ -162,3 +162,15 @@ cache/
 log/
 test/
 out/
+
+# 生成数据 / 临时文件
+data/
+reports/
+analysis/
+cron/output/
+cron/data_sync_report.txt
+cron/sync_status_*.txt
+*.whl
+*.backup
+web/node_modules/
+web/server

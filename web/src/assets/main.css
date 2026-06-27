@@ -1,0 +1,56 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.el-menu {
+  border-right: none !important;
+}
+
+.el-table .positive {
+  color: #f56c6c;
+}
+
+.el-table .negative {
+  color: #67c23a;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chart-container {
+  width: 100%;
+  height: 400px;
+}
+
+.stock-highlight {
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: white;
+  margin-bottom: 20px;
+}
+
+.stock-highlight h2 {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.stock-highlight .price {
+  font-size: 36px;
+  font-weight: bold;
+}
+
+.stock-highlight .change {
+  font-size: 18px;
+  margin-left: 10px;
+}
