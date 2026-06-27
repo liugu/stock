@@ -1,0 +1,67 @@
+{
+  "account_name": "realtime_account",
+  "initial_capital": 1000000,
+  "cash": 701749.5904,
+  "positions": {
+    "603533": {
+      "name": "掌阅科技",
+      "shares": 3800,
+      "cost_price": 25.85,
+      "current_price": 25.53,
+      "buy_time": "2026-05-28 07:29:19"
+    },
+    "600863": {
+      "name": "华能蒙电",
+      "shares": 14900,
+      "cost_price": 6.71,
+      "current_price": 6.73,
+      "buy_time": "2026-05-28 07:29:19"
+    },
+    "603578": {
+      "name": "三星新材",
+      "shares": 5900,
+      "cost_price": 16.94,
+      "current_price": 16.95,
+      "buy_time": "2026-05-28 07:29:19"
+    }
+  },
+  "trades": [
+    {
+      "time": "2026-05-28 07:29:19",
+      "type": "买入",
+      "code": "603533",
+      "name": "掌阅科技",
+      "price": 25.85,
+      "shares": 3800,
+      "amount": 98230.0,
+      "commission": 31.43,
+      "total_cost": 98261.43,
+      "strategy": "涨幅TOP策略"
+    },
+    {
+      "time": "2026-05-28 07:29:19",
+      "type": "买入",
+      "code": "600863",
+      "name": "华能蒙电",
+      "price": 6.71,
+      "shares": 14900,
+      "amount": 99979.0,
+      "commission": 31.99,
+      "total_cost": 100010.99,
+      "strategy": "涨幅TOP策略"
+    },
+    {
+      "time": "2026-05-28 07:29:19",
+      "type": "买入",
+      "code": "603578",
+      "name": "三星新材",
+      "price": 16.94,
+      "shares": 5900,
+      "amount": 99946.0,
+      "commission": 31.98,
+      "total_cost": 99977.98,
+      "strategy": "涨幅TOP策略"
+    }
+  ],
+  "daily_values": []
+}

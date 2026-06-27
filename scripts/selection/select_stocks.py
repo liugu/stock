@@ -30,7 +30,7 @@ def simple_ma(data, period):
 def stock_zh_a_spot_em() -> pd.DataFrame:
     """获取A股实时行情数据 - 分页获取全部数据"""
     all_data = []
-    url = "http://82.push2.eastmoney.com/api/qt/clist/get"
+    url = "https://push2.eastmoney.com/api/qt/clist/get"
 
     # 分页获取，每次5000条
     for page in range(1, 20):  # 最多获取20页，约10万条
@@ -87,7 +87,7 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
 @lru_cache()
 def code_id_map_em() -> dict:
     """获取股票和市场代码映射"""
-    url = "http://80.push2.eastmoney.com/api/qt/clist/get"
+    url = "https://push2.eastmoney.com/api/qt/clist/get"
     params = {
         "pn": "1", "pz": "50000", "po": "1", "np": "1",
         "ut": "bd1d9ddb04089700cf9c27f6f7426281",

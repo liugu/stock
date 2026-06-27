@@ -96,8 +96,8 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
     print("      尝试东方财富数据源...")
     all_data = []
     urls = [
-        "http://82.push2.eastmoney.com/api/qt/clist/get",
-        "http://80.push2.eastmoney.com/api/qt/clist/get",
+        "https://push2.eastmoney.com/api/qt/clist/get",
+        "https://push2.eastmoney.com/api/qt/clist/get",
     ]
 
     for url in urls:

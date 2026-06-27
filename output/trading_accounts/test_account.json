@@ -1,0 +1,48 @@
+{
+  "account_name": "test_account",
+  "initial_capital": 1000000,
+  "cash": 804999.6198399999,
+  "positions": {
+    "300373": {
+      "name": "扬杰科技",
+      "shares": 900,
+      "cost_price": 110.02,
+      "current_price": 110.02,
+      "buy_time": "2026-05-28 06:56:29"
+    },
+    "300763": {
+      "name": "锦浪科技",
+      "shares": 800,
+      "cost_price": 119.9,
+      "current_price": 119.9,
+      "buy_time": "2026-05-28 06:56:30"
+    }
+  },
+  "trades": [
+    {
+      "time": "2026-05-28 06:56:29",
+      "type": "买入",
+      "code": 300373,
+      "name": "扬杰科技",
+      "price": 110.02,
+      "shares": 900,
+      "amount": 99018.0,
+      "commission": 31.69,
+      "total_cost": 99049.69,
+      "strategy": "短线策略"
+    },
+    {
+      "time": "2026-05-28 06:56:30",
+      "type": "买入",
+      "code": 300763,
+      "name": "锦浪科技",
+      "price": 119.9,
+      "shares": 800,
+      "amount": 95920.0,
+      "commission": 30.69,
+      "total_cost": 95950.69,
+      "strategy": "短线策略"
+    }
+  ],
+  "daily_values": []
+}

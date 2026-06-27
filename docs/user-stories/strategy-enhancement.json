@@ -1,0 +1,125 @@
+[
+  {
+    "category": "functional",
+    "description": "添加成交量异动检测策略 - 放量突破和缩量回调",
+    "steps": [
+      "在 instock/core/strategy/ 创建 volume_breakout.py",
+      "实现放量突破检测：当日成交量 > 5日均量 * 2，涨幅 > 3%",
+      "实现缩量回调检测：连续3日缩量回调，但未跌破支撑位",
+      "在 daily_task_config.json 添加策略配置",
+      "运行选股验证策略输出"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "添加北向资金流向策略",
+    "steps": [
+      "在 instock/core/strategy/ 创建 northbound_flow.py",
+      "实现连续3日北向资金净流入检测",
+      "实现北向资金持股比例变化追踪",
+      "在 daily_task_config.json 添加策略配置",
+      "运行选股验证策略输出"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "添加KDJ和BOLL指标策略",
+    "steps": [
+      "在 instock/core/strategy/ 创建 kdj_strategy.py",
+      "实现KDJ金叉检测（K线上穿D线）",
+      "实现KDJ超卖反弹（J < 20 后回升）",
+      "在 instock/core/strategy/ 创建 boll_strategy.py",
+      "实现布林带突破（价格突破上轨）",
+      "实现布林带收口（带宽收窄后突破）",
+      "在 daily_task_config.json 添加策略配置"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "添加板块热度分析功能",
+    "steps": [
+      "在 cron/ 创建 sector_analysis.py",
+      "获取板块涨跌幅排行数据",
+      "计算板块内个股平均涨幅和成交额",
+      "识别热门板块（涨幅前5，成交额 > 100亿）",
+      "输出板块热度报告",
+      "集成到 daily_task.py"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "添加风控过滤 - ST股和退市风险股",
+    "steps": [
+      "在 instock/core/stockfetch.py 添加 ST 股票过滤函数",
+      "获取ST股票列表（股票名称包含ST）",
+      "获取退市风险股票列表（股票名称包含*ST）",
+      "在选股流程中自动过滤这些股票",
+      "在输出报告中显示过滤统计"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "添加财务指标筛选",
+    "steps": [
+      "在 instock/core/strategy/ 创建 financial_filter.py",
+      "实现 ROE 筛选（连续3年 ROE > 15%）",
+      "实现负债率筛选（资产负债率 < 60%）",
+      "实现现金流筛选（经营现金流 > 0）",
+      "添加财务数据获取函数",
+      "在 daily_task_config.json 添加策略配置"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "添加止盈止损建议位计算",
+    "steps": [
+      "在选股结果中添加止盈位（压力位 + 5%）",
+      "在选股结果中添加止损位（支撑位 - 3%）",
+      "计算基于ATR的动态止损位",
+      "在推送消息中展示止盈止损建议"
+    ],
+    "passes": true
+  },
+  {
+    "category": "ui",
+    "description": "优化推送消息格式 - 按板块分组",
+    "steps": [
+      "修改 cron/daily_task.py 的推送格式",
+      "获取股票所属板块信息",
+      "按板块分组展示选股结果",
+      "每个板块显示板块涨幅和个股列表",
+      "测试微信推送显示效果"
+    ],
+    "passes": true
+  },
+  {
+    "category": "integration",
+    "description": "添加回测验证功能",
+    "steps": [
+      "创建 backtest/quick_backtest.py",
+      "实现策略历史胜率计算（近30/60/90天）",
+      "计算策略收益率和最大回撤",
+      "输出回测报告",
+      "在选股结果中显示策略历史胜率"
+    ],
+    "passes": true
+  },
+  {
+    "category": "edge-case",
+    "description": "添加节假日休市判断",
+    "steps": [
+      "在 instock/lib/trade_time.py 添加节假日判断函数",
+      "获取A股交易日历数据",
+      "在 cron/daily_task.py 中添加休市判断",
+      "休市日跳过选股任务",
+      "记录跳过日志"
+    ],
+    "passes": true
+  }
+]

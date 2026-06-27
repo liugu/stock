@@ -7,6 +7,7 @@
 2. 使用 Baostock 更新历史行情（支持会话恢复）
 3. 支持指定日期范围更新
 4. 进度监控和错误日志
+5. 实时进度显示、批量写入优化
 
 使用方法：
     python scripts/sync_stock_data.py              # 自动补齐缺失数据
@@ -17,6 +18,11 @@
 
 import sys
 import os
+
+# 强制UTF-8输出
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+sys.stdout.reconfigure(encoding='utf-8')
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import argparse
@@ -225,7 +231,7 @@ def find_missing_dates(start_date=None, end_date=None):
 
 
 def update_single_date(target_date, stock_map, session):
-    """更新单日数据"""
+    """更新单日数据 - 批量收集，一次性写入"""
     target_date_str = target_date.strftime('%Y-%m-%d')
     
     # 获取前几天的数据用于计算涨跌幅
@@ -236,19 +242,23 @@ def update_single_date(target_date, stock_map, session):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    success = 0
-    fail = 0
-    no_data = 0
-    start_time = time.time()
-    
     # 检查已有数据
-    cursor.execute("SELECT COUNT(*) FROM stock_daily WHERE date = ?", (target_date_str,))
+    cursor.execute("SELECT COUNT(*) FROM stock_daily WHERE date = %s", (target_date_str,))
     existing = cursor.fetchone()[0]
     
     if existing >= len(stock_map) * 0.9:  # 已有90%数据
         logger.info(f"{target_date_str} 已有 {existing} 条数据，跳过更新")
         conn.close()
         return existing, 0, 0
+    
+    # 收集所有数据
+    all_data = []
+    success = 0
+    fail = 0
+    no_data = 0
+    errors = []
+    start_time = time.time()
+    last_print_time = start_time
     
     for i, (code, info) in enumerate(stock_map.items(), 1):
         try:
@@ -303,63 +313,79 @@ def update_single_date(target_date, stock_map, session):
                 prev_close = safe_float(prev_rows.iloc[-1]['close'])
                 curr_close = safe_float(row['close'])
                 change_pct = (curr_close - prev_close) / prev_close * 100 if prev_close > 0 else 0.0
-            else:
-                change_pct = 0.0
-            
-            # 计算振幅
-            high = safe_float(row['high'])
-            low = safe_float(row['low'])
-            if len(prev_rows) > 0:
-                prev_close = safe_float(prev_rows.iloc[-1]['close'])
+                high = safe_float(row['high'])
+                low = safe_float(row['low'])
                 amplitude = (high - low) / prev_close * 100 if prev_close > 0 else 0.0
             else:
+                change_pct = 0.0
                 amplitude = 0.0
             
-            # 写入数据库
-            sql = '''
-            INSERT INTO stock_daily (stock_id, date, open, close, high, low, volume, amount, change_percent, amplitude, turnover_rate)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE 
-            open=VALUES(open), close=VALUES(close), high=VALUES(high), low=VALUES(low),
-            volume=VALUES(volume), amount=VALUES(amount), change_percent=VALUES(change_percent),
-            amplitude=VALUES(amplitude), turnover_rate=VALUES(turnover_rate)
-            '''
-            
-            cursor.execute(sql, (
-                info['id'],
-                target_date_str,
-                safe_float(row['open']),
-                safe_float(row['close']),
-                safe_float(row['high']),
-                safe_float(row['low']),
-                safe_float(row['volume']),
-                safe_float(row['amount']),
-                change_pct,
-                amplitude,
-                safe_float(row['turn'])
-            ))
+            # 收集数据
+            all_data.append({
+                'stock_id': info['id'],
+                'date': target_date_str,
+                'open': safe_float(row['open']),
+                'close': safe_float(row['close']),
+                'high': safe_float(row['high']),
+                'low': safe_float(row['low']),
+                'volume': safe_float(row['volume']),
+                'amount': safe_float(row['amount']),
+                'change_percent': change_pct,
+                'amplitude': amplitude,
+                'turnover_rate': safe_float(row['turn'])
+            })
             
             success += 1
-            
-            # 每100条提交一次
-            if success % 100 == 0:
-                conn.commit()
-            
+        
         except Exception as e:
             fail += 1
-            if fail <= 10:
-                logger.error(f"处理失败 {code}: {e}")
+            if len(errors) < 20:
+                errors.append(f"{code}: {str(e)[:50]}")
         
-        # 进度显示
-        if i % 500 == 0:
-            elapsed = time.time() - start_time
-            logger.info(f"进度: {i}/{len(stock_map)} 成功:{success} 失败:{fail} 无数据:{no_data} 耗时:{elapsed:.0f}s")
+        # 每50只股票或每3秒输出一次进度
+        current_time = time.time()
+        if i % 50 == 0 or (current_time - last_print_time) >= 3:
+            elapsed = current_time - start_time
+            speed = i / elapsed if elapsed > 0 else 0
+            remaining = (len(stock_map) - i) / speed if speed > 0 else 0
+            logger.info(f"[{i}/{len(stock_map)}] 成功:{success} 失败:{fail} 无数据:{no_data} 速度:{speed:.1f}股/秒 剩余:{remaining:.0f}秒")
+            last_print_time = current_time
     
-    conn.commit()
+    # 批量写入数据库
+    if all_data:
+        write_start = time.time()
+        logger.info(f"写入 {len(all_data)} 条数据到数据库...")
+        
+        # 先删除已有数据
+        cursor.execute("DELETE FROM stock_daily WHERE date = %s", (target_date_str,))
+        
+        # 批量插入
+        sql = '''
+        INSERT INTO stock_daily (stock_id, date, open, close, high, low, volume, amount, change_percent, amplitude, turnover_rate)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        '''
+        
+        values = [
+            (d['stock_id'], d['date'], d['open'], d['close'], d['high'], d['low'],
+             d['volume'], d['amount'], d['change_percent'], d['amplitude'], d['turnover_rate'])
+            for d in all_data
+        ]
+        
+        cursor.executemany(sql, values)
+        conn.commit()
+        
+        write_elapsed = time.time() - write_start
+        logger.info(f"写入成功: {cursor.rowcount} 条, 耗时 {write_elapsed:.2f}秒")
+    
     conn.close()
     
     elapsed = time.time() - start_time
-    logger.info(f"完成 {target_date_str}: 成功 {success}, 失败 {fail}, 无数据 {no_data}, 耗时 {elapsed:.1f}s")
+    logger.info(f"完成 {target_date_str}: 成功 {success}, 失败 {fail}, 无数据 {no_data}, 总耗时 {elapsed:.1f}秒")
+    
+    if errors:
+        logger.warning(f"前 {len(errors)} 个错误:")
+        for err in errors[:10]:
+            logger.warning(f"  - {err}")
     
     return success, fail, no_data
 
