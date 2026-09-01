@@ -87,3 +87,11 @@ export const getMarketStats = async () => {
   }>('/market/stats')
   return res.data
 }
+
+// 按涨跌分类获取股票（供统计卡片跳转）
+export const getMarketStocks = async (filter: string, page = 1, pageSize = 50) => {
+  const res = await api.get<{ data: StockDaily[], total: number }>('/market/stocks', {
+    params: { filter, page, pageSize }
+  })
+  return res.data
+}

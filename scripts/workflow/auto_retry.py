@@ -16,8 +16,23 @@ PROJECT_DIR = r'E:\量化研究\workspace\stock'
 sys.path.insert(0, PROJECT_DIR)
 
 # ========== 飞书配置 ==========
-FEISHU_APP_ID = 'cli_aa9f0f0c99b95bda'
-FEISHU_APP_SECRET = 'SECRET_PLACEHOLDER'  # 从 Hermes .env 读取
+# 注意：App Secret 绝不硬编码进仓库（已被 GitHub 密钥扫描拦截）。
+# 从环境变量或本地未提交的密钥文件读取。
+FEISHU_APP_ID = os.environ.get('FEISHU_APP_ID', 'cli_aa9f0f0c99b95bda')
+
+def _load_secret():
+    s = os.environ.get('FEISHU_APP_SECRET')
+    if s:
+        return s.strip()
+    for p in (os.path.join(PROJECT_DIR, 'feishu_secret.txt'),
+              os.path.join(PROJECT_DIR, 'config', 'feishu_secret.txt')):
+        if os.path.exists(p):
+            v = open(p, encoding='utf-8').read().strip()
+            if v:
+                return v
+    return ''
+
+FEISHU_APP_SECRET = _load_secret()
 
 # 飞书用户 ID (从 Hermes gateway 获取或手动设置)
 FEISHU_USER_ID = "on_c7a116a8cd0c82db48fb99abac0cafbd"  # 你的飞书 open_id

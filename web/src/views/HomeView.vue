@@ -3,7 +3,7 @@
     <!-- 市场概览 -->
     <el-row :gutter="20" class="stats-row">
       <el-col :span="6">
-        <el-card shadow="hover">
+        <el-card shadow="hover" class="stat-card-clickable" @click="goToFilter('up')">
           <div class="stat-card">
             <div class="stat-icon up">
               <el-icon :size="32"><TrendCharts /></el-icon>
@@ -16,7 +16,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover">
+        <el-card shadow="hover" class="stat-card-clickable" @click="goToFilter('down')">
           <div class="stat-card">
             <div class="stat-icon down">
               <el-icon :size="32"><TrendCharts /></el-icon>
@@ -29,7 +29,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover">
+        <el-card shadow="hover" class="stat-card-clickable" @click="goToFilter('flat')">
           <div class="stat-card">
             <div class="stat-icon flat">
               <el-icon :size="32"><Minus /></el-icon>
@@ -42,7 +42,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover">
+        <el-card shadow="hover" class="stat-card-clickable" @click="goToFilter('limit_up')">
           <div class="stat-card">
             <div class="stat-icon limit-up">
               <el-icon :size="32"><Top /></el-icon>
@@ -133,14 +133,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { TrendCharts, Minus, Top } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { useStockStore } from '@/stores/stock'
+import { useRouter } from 'vue-router'
 import * as api from '@/api'
 import type { StockDaily } from '@/types'
 
 const stockStore = useStockStore()
+const router = useRouter()
 
 const marketStats = ref({
   up_count: 0,
@@ -153,12 +155,14 @@ const marketStats = ref({
 const hotStocks = ref<StockDaily[]>([])
 const loadingStrategy = ref('')
 const chartRef = ref<HTMLElement>()
+let chartInstance: echarts.ECharts | null = null
+let isMounted = true
 
 const quickStrategies = [
+  { name: 'hot', label: '今日热门' },
+  { name: 'limit_up', label: '涨停板' },
   { name: 'ma_cross', label: '均线金叉' },
-  { name: 'volume_break', label: '放量突破' },
-  { name: 'macd_gold', label: 'MACD金叉' },
-  { name: 'rsi_oversold', label: 'RSI超跌' }
+  { name: 'volume_break', label: '放量突破' }
 ]
 
 const runQuickStrategy = async (name: string) => {
@@ -172,12 +176,14 @@ const runQuickStrategy = async (name: string) => {
 }
 
 const formatVolume = (vol: number) => {
+  if (!vol) return '-'
   if (vol >= 100000000) return (vol / 100000000).toFixed(2) + '亿'
   if (vol >= 10000) return (vol / 10000).toFixed(2) + '万'
   return vol.toString()
 }
 
 const formatAmount = (amt: number) => {
+  if (!amt) return '-'
   if (amt >= 100000000) return (amt / 100000000).toFixed(2) + '亿'
   if (amt >= 10000) return (amt / 10000).toFixed(2) + '万'
   return amt.toString()
@@ -186,11 +192,12 @@ const formatAmount = (amt: number) => {
 const initChart = async () => {
   if (!chartRef.value) return
   
-  const chart = echarts.init(chartRef.value)
+  chartInstance = echarts.init(chartRef.value)
   
   // 获取涨跌幅分布数据
   try {
     const quotes = await api.getLatestQuotes()
+    if (!isMounted) return  // 组件已卸载不继续
     
     const ranges = [
       { name: '涨停', min: 9.9, max: 20 },
@@ -211,7 +218,7 @@ const initChart = async () => {
       return quotes.filter(q => q.change_percent >= r.min && q.change_percent < r.max).length
     })
     
-    chart.setOption({
+    chartInstance.setOption({
       tooltip: { trigger: 'axis' },
       xAxis: {
         type: 'category',
@@ -233,6 +240,17 @@ const initChart = async () => {
     console.error('Failed to load chart data:', e)
   }
 }
+
+const goToFilter = (filter: string) => {
+  router.push({ path: '/stocks', query: { filter } })
+}
+
+// 组件卸载时只设标记，防止异步回调操作已卸载的DOM
+// 不手动 dispose echarts，Vue 会自然清理 DOM，避免 'vnode is null' 错误
+onUnmounted(() => {
+  isMounted = false
+  chartInstance = null
+})
 
 onMounted(async () => {
   try {
@@ -259,6 +277,14 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.stat-card-clickable {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.stat-card-clickable:hover {
+  transform: translateY(-2px);
 }
 
 .stat-icon {

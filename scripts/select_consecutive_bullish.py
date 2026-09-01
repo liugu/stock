@@ -55,7 +55,14 @@ def get_stock_list():
             WHERE date >= DATE_SUB(CURDATE(), INTERVAL 10 DAY)
             GROUP BY stock_id
         ) sd ON si.id = sd.stock_id
-        LEFT JOIN cn_stock_spot cs ON BINARY si.code = BINARY cs.code
+        LEFT JOIN (
+            SELECT cs1.* FROM cn_stock_spot cs1
+            INNER JOIN (
+                SELECT code, MAX(date) as max_date
+                FROM cn_stock_spot
+                GROUP BY code
+            ) cs2 ON cs1.code = cs2.code AND cs1.date = cs2.max_date
+        ) cs ON BINARY si.code = BINARY cs.code
         WHERE si.code REGEXP '^(600|601|603|605|000|001|002|003|300|301)'
         """
         df = pd.read_sql(sql, conn)
